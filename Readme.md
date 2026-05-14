@@ -53,28 +53,32 @@ Migrated from a traditional **IaaS (EC2-based)** architecture to a fully **Event
 
 ## 🏗️ Architecture
 
-```
-                        ┌──────────────────────────────────────────────────────┐
-                        │              AWS Cloud Environment                   │
-                        │                                                      │
-  [Physical Turnstile]  │  ┌─────────────┐    ┌──────────────┐                │
-        │               │  │             │    │              │                │
-        │  REST API      │  │  Amazon     │    │  AWS Lambda  │                │
-        └──────────────►├─►│  API        ├───►│  (Python     │                │
-          HTTP Request  │  │  Gateway    │    │   3.12)      │                │
-                        │  │             │    │              │                │
-                        │  └─────────────┘    └──────┬───────┘                │
-                        │                           │                         │
-                        │              ┌────────────┼───────────┐             │
-                        │              │            │           │             │
-                        │              ▼            ▼           ▼             │
-                        │       ┌──────────┐  ┌─────────┐  ┌────────┐        │
-                        │       │ Amazon   │  │ Amazon  │  │ Amazon │        │
-                        │       │ RDS      │  │ S3      │  │ SNS +  │        │
-                        │       │ (MySQL)  │  │ (Logs)  │  │ CW     │        │
-                        │       └──────────┘  └─────────┘  └────────┘        │
-                        │       Student DB    Audit Logs    Alerts/Monitor    │
-                        └──────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph Client
+        A[Physical Turnstile]
+    end
+
+    subgraph AWS Cloud Environment
+        B(Amazon API Gateway)
+        C{AWS Lambda}
+        D[(Amazon RDS MySQL)]
+        E[Amazon S3 Logs]
+        F((Amazon SNS Alerts))
+    end
+
+    A -- "HTTP POST" --> B
+    B -- "Triggers" --> C
+    C -- "Validates ID" --> D
+    C -- "Audit Trail" --> E
+    C -- "Access Denied" --> F
+    
+    style A fill:#1e293b,stroke:#334155,stroke-width:2px,color:#fff
+    style B fill:#FF4F8B,stroke:#fff,stroke-width:2px,color:#fff
+    style C fill:#FF9900,stroke:#fff,stroke-width:2px,color:#fff
+    style D fill:#527FFF,stroke:#fff,stroke-width:2px,color:#fff
+    style E fill:#569A31,stroke:#fff,stroke-width:2px,color:#fff
+    style F fill:#FF4F8B,stroke:#fff,stroke-width:2px,color:#fff
 ```
 
 ---
