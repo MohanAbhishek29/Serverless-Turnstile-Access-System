@@ -1,0 +1,52 @@
+{
+    "openapi": "3.0.1",
+    "info": {
+        "title": "TurnstileAccessAPI",
+        "version": "1.0"
+    },
+    "paths": {
+        "/scan": {
+            "post": {
+                "summary": "Process a turnstile card scan",
+                "x-amazon-apigateway-integration": {
+                    "uri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:1234567890:function:TurnstileAuthFunction/invocations",
+                    "responses": {
+                        "default": {
+                            "statusCode": "200"
+                        }
+                    },
+                    "passthroughBehavior": "when_no_match",
+                    "httpMethod": "POST",
+                    "type": "aws_proxy"
+                },
+                "responses": {
+                    "200": {
+                        "description": "Access Granted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Access Denied (Invalid ID or Capacity Full)"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "SuccessResponse": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}
