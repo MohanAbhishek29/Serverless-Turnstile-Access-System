@@ -51,35 +51,25 @@ Migrated from a traditional **IaaS (EC2-based)** architecture to a fully **Event
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture Flow
 
-```mermaid
-graph LR
-    subgraph Client
-        A[Physical Turnstile]
-    end
+<br>
 
-    subgraph AWS Cloud Environment
-        B(Amazon API Gateway)
-        C{AWS Lambda}
-        D[(Amazon RDS MySQL)]
-        E[Amazon S3 Logs]
-        F((Amazon SNS Alerts))
-    end
+**1️⃣ Client / Trigger** ➔ `Physical Turnstile Scanner`
+> Student taps ID card. Scanner sends an `HTTP POST` request to the cloud.
 
-    A -- "HTTP POST" --> B
-    B -- "Triggers" --> C
-    C -- "Validates ID" --> D
-    C -- "Audit Trail" --> E
-    C -- "Access Denied" --> F
-    
-    style A fill:#1e293b,stroke:#334155,stroke-width:2px,color:#fff
-    style B fill:#FF4F8B,stroke:#fff,stroke-width:2px,color:#fff
-    style C fill:#FF9900,stroke:#fff,stroke-width:2px,color:#fff
-    style D fill:#527FFF,stroke:#fff,stroke-width:2px,color:#fff
-    style E fill:#569A31,stroke:#fff,stroke-width:2px,color:#fff
-    style F fill:#FF4F8B,stroke:#fff,stroke-width:2px,color:#fff
-```
+**2️⃣ API Layer** ➔ <img src="https://img.shields.io/badge/Amazon_API_Gateway-%23FF4F8B.svg?style=flat&logo=amazon-api-gateway&logoColor=white" height="22" />
+> Acts as the highly scalable front door, receiving the traffic and passing the payload.
+
+**3️⃣ Core Logic** ➔ <img src="https://img.shields.io/badge/AWS_Lambda-%23FF9900.svg?style=flat&logo=aws-lambda&logoColor=white" height="22" />
+> The serverless brain (Python 3.12). Wakes up instantly, parses the request, and orchestrates validation.
+
+**4️⃣ Database** ➔ <img src="https://img.shields.io/badge/Amazon_RDS_(MySQL)-%23527FFF.svg?style=flat&logo=amazon-rds&logoColor=white" height="22" />
+> Lambda queries the database to authenticate the student and check event capacities.
+
+**5️⃣ Output & Persistence**
+> ├─ ✅ **If Access Granted:** Drops a timestamped record into <img src="https://img.shields.io/badge/Amazon_S3-%23569A31.svg?style=flat&logo=amazon-s3&logoColor=white" height="20" align="top" /> for auditing.
+> └─ ❌ **If Access Denied:** Triggers <img src="https://img.shields.io/badge/Amazon_SNS-%23FF4F8B.svg?style=flat&logo=amazon-sns&logoColor=white" height="20" align="top" /> to instantly alert admins.
 
 ---
 
