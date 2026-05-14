@@ -73,6 +73,48 @@ Migrated from a traditional **IaaS (EC2-based)** architecture to a fully **Event
 
 ---
 
+## 🎮 Interactive Architecture Design
+
+Instead of just reading about the architecture, **experience it live!**  
+I've built a custom visual simulator that animates the data flow across all AWS services when a turnstile scan occurs.
+
+<div align="center">
+  <br>
+  <a href="https://mohanabhishek29.github.io/Serverless-Turnstile-Access-System/demo/index.html" target="_blank">
+    <img src="https://img.shields.io/badge/🚀_LAUNCH_LIVE_AWS_SIMULATOR-1e293b?style=for-the-badge&logo=amazon-aws&logoColor=FF9900" alt="Launch Live Simulator" />
+  </a>
+  <br>
+  <p><i>Click above to simulate Valid/Invalid scans and watch the serverless system react in real-time!</i></p>
+</div>
+
+<br>
+
+### 🔍 Deep Dive: Component Interactions (Click to Expand)
+
+<details>
+<summary><b>🟢 Scenario A: Valid Student Scan (Access Granted)</b></summary>
+<br>
+1. <b>API Gateway</b> receives the scan payload.<br>
+2. <b>Lambda</b> cold-starts/invokes instantly.<br>
+3. <b>RDS (MySQL)</b> confirms the ID exists and event capacity is < 100%.<br>
+4. <b>S3</b> receives a structured JSON log of the successful entry.<br>
+5. <b>Turnstile</b> unlocks.
+<br>
+</details>
+
+<details>
+<summary><b>🔴 Scenario B: Invalid Scan / Capacity Full (Access Denied)</b></summary>
+<br>
+1. <b>API Gateway</b> receives the scan payload.<br>
+2. <b>Lambda</b> invokes and queries the database.<br>
+3. <b>RDS (MySQL)</b> reports that the student is suspended OR the event is full.<br>
+4. <b>SNS</b> instantly fires an email/SMS alert to the administration team.<br>
+5. <b>Turnstile</b> remains locked.
+<br>
+</details>
+
+---
+
 ## ☁️ AWS Services Used
 
 | Service | Role | Purpose |
