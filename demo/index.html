@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serverless Turnstile Access System - Live Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Fira+Code:wght@400;500&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .font-mono {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Glassmorphism */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Node Styles */
+        .aws-node {
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 10;
+        }
+
+        .aws-node::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 0.75rem;
+            background: transparent;
+            z-index: -1;
+            transition: all 0.3s ease;
+            opacity: 0;
+            filter: blur(8px);
+        }
+
+        .node-active {
+            transform: scale(1.05);
+            border-color: #fff !important;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        .node-active::before {
+            opacity: 1;
+        }
+
+        .status-granted .node-active::before { background: rgba(34, 197, 94, 0.6); }
+        .status-denied .node-active::before { background: rgba(239, 68, 68, 0.6); }
+        
+        .color-api { border-top: 4px solid #FF4F8B; }
+        .color-lambda { border-top: 4px solid #FF9900; }
+        .color-rds { border-top: 4px solid #527FFF; }
+        .color-s3 { border-top: 4px solid #569A31; }
+        .color-sns { border-top: 4px solid #FF4F8B; }
+        
+        .active-api::before { background: rgba(255, 79, 139, 0.6); }
+        .active-lambda::before { background: rgba(255, 153, 0, 0.6); }
+        .active-rds::before { background: rgba(82, 127, 255, 0.6); }
+        .active-s3::before { background: rgba(86, 154, 49, 0.6); }
+        .active-sns::before { background: rgba(255, 79, 139, 0.6); }
+
+        /* Connections */
+        .diagram-container {
+            position: relative;
+        }
+
+        .connection-line {
+            position: absolute;
+            background: rgba(148, 163, 184, 0.2);
+            z-index: 1;
+        }
+
+        .connection-line.horizontal {
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .connection-line.vertical {
+            width: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Particles */
+        .particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #fff, 0 0 20px #fff;
+            z-index: 5;
+            opacity: 0;
+        }
+
+        .anim-move-right {
+            animation: moveRight 1s linear forwards;
+        }
+
+        .anim-move-up-right {
+            animation: moveUpRight 1s linear forwards;
+        }
+
+        .anim-move-down-right {
+            animation: moveDownRight 1s linear forwards;
+        }
+
+        @keyframes moveRight {
+            0% { left: 0; opacity: 1; transform: translateY(-50%) scale(1); }
+            50% { transform: translateY(-50%) scale(1.5); }
+            100% { left: 100%; opacity: 0; transform: translateY(-50%) scale(1); }
+        }
+
+        @keyframes moveUpRight {
+            0% { left: 0; top: 100%; opacity: 1; }
+            100% { left: 100%; top: 0; opacity: 0; }
+        }
+
+        @keyframes moveDownRight {
+            0% { left: 0; top: 0; opacity: 1; }
+            100% { left: 100%; top: 100%; opacity: 0; }
+        }
+
+        /* Log Terminal */
+        .terminal {
+            background: #020617;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            height: 300px;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+        
+        .log-entry {
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+
+        .log-time { color: #64748b; }
+        .log-info { color: #38bdf8; }
+        .log-success { color: #4ade80; }
+        .log-error { color: #f87171; }
+        .log-warn { color: #fbbf24; }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* SVG Paths */
+        svg.connecting-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        path.line {
+            fill: none;
+            stroke: rgba(148, 163, 184, 0.2);
+            stroke-width: 2;
+        }
+
+        path.line-animated {
+            fill: none;
+            stroke: #fff;
+            stroke-width: 3;
+            stroke-dasharray: 10, 10;
+            animation: dash 1s linear infinite;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.8));
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .path-active {
+            opacity: 1 !important;
+        }
+
+        .path-success { stroke: #4ade80 !important; filter: drop-shadow(0 0 5px #4ade80) !important; }
+        .path-error { stroke: #f87171 !important; filter: drop-shadow(0 0 5px #f87171) !important; }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -20;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="p-6 border-b border-slate-800 glass-panel sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white text-2xl shadow-lg shadow-orange-500/20">
+                    <i class="fa-solid fa-server"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">Serverless Turnstile Access System</h1>
+                    <p class="text-sm text-slate-400">Event-Driven Architecture Simulation</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <span class="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold flex items-center gap-2"><i class="fa-brands fa-aws text-orange-400"></i> 100% Serverless</span>
+                <span class="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold flex items-center gap-2"><i class="fa-solid fa-bolt text-yellow-400"></i> Event-Driven</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-6 flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto w-full">
+        
+        <!-- Left Panel: Controls & Logs -->
+        <div class="w-full lg:w-1/3 flex flex-col gap-6">
+            
+            <!-- Control Panel -->
+            <div class="glass-panel rounded-2xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fa-solid fa-gamepad text-indigo-400"></i> Simulation Controls</h2>
+                <p class="text-sm text-slate-400 mb-6">Trigger events to see how the serverless architecture responds in real-time.</p>
+                
+                <div class="flex flex-col gap-3">
+                    <button id="btn-valid" class="group relative px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-green-500/30 hover:border-green-500 rounded-xl transition-all text-left flex items-center justify-between overflow-hidden">
+                        <div class="absolute inset-0 w-1 bg-green-500 transition-all group-hover:w-full group-hover:opacity-10 z-0"></div>
+                        <span class="relative z-10 font-medium text-green-400"><i class="fa-solid fa-id-card mr-2"></i> Simulate Valid Scan</span>
+                        <i class="fa-solid fa-arrow-right relative z-10 text-slate-500 group-hover:text-green-400 transition-colors"></i>
+                    </button>
+                    
+                    <button id="btn-invalid" class="group relative px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-red-500/30 hover:border-red-500 rounded-xl transition-all text-left flex items-center justify-between overflow-hidden">
+                        <div class="absolute inset-0 w-1 bg-red-500 transition-all group-hover:w-full group-hover:opacity-10 z-0"></div>
+                        <span class="relative z-10 font-medium text-red-400"><i class="fa-solid fa-id-card-clip mr-2"></i> Simulate Invalid Scan</span>
+                        <i class="fa-solid fa-arrow-right relative z-10 text-slate-500 group-hover:text-red-400 transition-colors"></i>
+                    </button>
+
+                    <button id="btn-reset" class="mt-2 px-4 py-2 bg-transparent hover:bg-slate-800 border border-slate-700 rounded-lg transition-all text-sm text-center text-slate-300">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Reset Dashboard
+                    </button>
+                </div>
+
+                <div class="mt-6 p-4 bg-slate-900 rounded-xl border border-slate-800">
+                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">System Status</h3>
+                    <div class="flex items-center justify-between text-sm">
+                        <span>Idle Cost</span>
+                        <span class="font-mono text-green-400">$0.00 / hr</span>
+                    </div>
+                    <div class="flex items-center justify-between text-sm mt-1">
+                        <span>Active Servers</span>
+                        <span class="font-mono text-slate-300">0 (Serverless)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal -->
+            <div class="glass-panel rounded-2xl p-4 flex-grow flex flex-col">
+                <div class="flex items-center gap-2 mb-3 px-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="text-xs text-slate-500 font-mono ml-2">cloudwatch_logs.sh</span>
+                </div>
+                <div id="terminal" class="terminal font-mono text-sm">
+                    <div class="log-entry text-slate-500">System initialized. Waiting for events...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Architecture Diagram -->
+        <div class="w-full lg:w-2/3 glass-panel rounded-2xl p-8 flex flex-col diagram-container" id="diagram-container">
+            <h2 class="text-xl font-bold mb-8 text-center text-slate-200">Live Architecture Flow</h2>
+            
+            <!-- SVG for connecting lines -->
+            <svg class="connecting-lines" id="svg-lines">
+                <!-- Lines will be drawn here by JS -->
+            </svg>
+
+            <div class="flex-grow flex items-center justify-center relative">
+                
+                <div class="grid grid-cols-4 gap-4 md:gap-8 w-full max-w-4xl relative z-10">
+                    
+                    <!-- Column 1: Client -->
+                    <div class="flex flex-col justify-center items-center gap-8">
+                        <div id="node-turnstile" class="aws-node bg-slate-800 border border-slate-700 rounded-xl p-4 w-32 flex flex-col items-center text-center shadow-lg">
+                            <i class="fa-solid fa-turn-down fa-rotate-90 text-3xl text-slate-300 mb-2"></i>
+                            <span class="text-xs font-semibold">Physical Turnstile</span>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Entry -->
+                    <div class="flex flex-col justify-center items-center">
+                        <div id="node-apigw" class="aws-node color-api bg-slate-800 border border-slate-700 rounded-xl p-4 w-32 flex flex-col items-center text-center shadow-lg">
+                            <i class="fa-solid fa-door-open text-3xl text-pink-400 mb-2"></i>
+                            <span class="text-xs font-semibold">API Gateway</span>
+                            <span class="text-[10px] text-slate-500 mt-1">REST API</span>
+                        </div>
+                    </div>
+
+                    <!-- Column 3: Compute -->
+                    <div class="flex flex-col justify-center items-center">
+                        <div id="node-lambda" class="aws-node color-lambda bg-slate-800 border border-slate-700 rounded-xl p-4 w-32 flex flex-col items-center text-center shadow-lg relative">
+                            <i class="fa-brands fa-python text-3xl text-orange-400 mb-2"></i>
+                            <span class="text-xs font-semibold">AWS Lambda</span>
+                            <span class="text-[10px] text-slate-500 mt-1">Auth & Logic</span>
+                            <!-- Status Indicator -->
+                            <div id="lambda-status" class="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-slate-700 border-2 border-slate-800 flex items-center justify-center opacity-0 transition-opacity">
+                                <i class="fa-solid fa-check text-[10px] text-white"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 4: Storage & Output -->
+                    <div class="flex flex-col justify-between gap-6 py-4">
+                        <div id="node-rds" class="aws-node color-rds bg-slate-800 border border-slate-700 rounded-xl p-4 w-32 flex flex-col items-center text-center shadow-lg">
+                            <i class="fa-solid fa-database text-3xl text-blue-400 mb-2"></i>
+                            <span class="text-xs font-semibold">Amazon RDS</span>
+                            <span class="text-[10px] text-slate-500 mt-1">Student DB</span>
+                        </div>
+                        
+                        <div id="node-s3" class="aws-node color-s3 bg-slate-800 border border-slate-700 rounded-xl p-4 w-32 flex flex-col items-center text-center shadow-lg">
+                            <i class="fa-solid fa-bucket text-3xl text-green-500 mb-2"></i>
+                            <span class="text-xs font-semibold">Amazon S3</span>
+                            <span class="text-[10px] text-slate-500 mt-1">Audit Logs</span>
+                        </div>
+
+                        <div id="node-sns" class="aws-node color-sns bg-slate-800 border border-slate-700 rounded-xl p-4 w-32 flex flex-col items-center text-center shadow-lg">
+                            <i class="fa-solid fa-bell text-3xl text-pink-400 mb-2"></i>
+                            <span class="text-xs font-semibold">SNS + Alerts</span>
+                            <span class="text-[10px] text-slate-500 mt-1">Admin Notify</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            
+            <div class="mt-8 text-center text-sm text-slate-400">
+                <p>Status: <span id="system-status" class="text-slate-200 font-semibold">Awaiting input...</span></p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // DOM Elements
+        const terminal = document.getElementById('terminal');
+        const btnValid = document.getElementById('btn-valid');
+        const btnInvalid = document.getElementById('btn-invalid');
+        const btnReset = document.getElementById('btn-reset');
+        const sysStatus = document.getElementById('system-status');
+        const lambdaStatus = document.getElementById('lambda-status');
+        const svgContainer = document.getElementById('svg-lines');
+
+        const nodes = {
+            turnstile: document.getElementById('node-turnstile'),
+            apigw: document.getElementById('node-apigw'),
+            lambda: document.getElementById('node-lambda'),
+            rds: document.getElementById('node-rds'),
+            s3: document.getElementById('node-s3'),
+            sns: document.getElementById('node-sns')
+        };
+
+        // Paths map
+        const paths = {};
+
+        // Utility: Get Center of Element
+        function getCenter(el) {
+            const rect = el.getBoundingClientRect();
+            const containerRect = svgContainer.getBoundingClientRect();
+            return {
+                x: rect.left + rect.width / 2 - containerRect.left,
+                y: rect.top + rect.height / 2 - containerRect.top
+            };
+        }
+
+        // Draw Lines
+        function drawLines() {
+            svgContainer.innerHTML = ''; // Clear
+            
+            // Define connections
+            const connections = [
+                { id: 'path-t-a', from: 'turnstile', to: 'apigw' },
+                { id: 'path-a-l', from: 'apigw', to: 'lambda' },
+                { id: 'path-l-r', from: 'lambda', to: 'rds' },
+                { id: 'path-l-s', from: 'lambda', to: 's3' },
+                { id: 'path-l-n', from: 'lambda', to: 'sns' }
+            ];
+
+            connections.forEach(conn => {
+                const p1 = getCenter(nodes[conn.from]);
+                const p2 = getCenter(nodes[conn.to]);
+                
+                // Static Line
+                const staticLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                // Curve logic for visual appeal
+                const curve = Math.abs(p1.y - p2.y) > 20 ? 40 : 0;
+                const d = `M ${p1.x} ${p1.y} C ${p1.x + curve} ${p1.y}, ${p2.x - curve} ${p2.y}, ${p2.x} ${p2.y}`;
+                
+                staticLine.setAttribute('d', d);
+                staticLine.setAttribute('class', 'line');
+                svgContainer.appendChild(staticLine);
+
+                // Animated Line (Hidden initially)
+                const animLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                animLine.setAttribute('d', d);
+                animLine.setAttribute('class', 'line-animated');
+                animLine.setAttribute('id', conn.id);
+                svgContainer.appendChild(animLine);
+
+                paths[conn.id] = animLine;
+            });
+        }
+
+        // Draw initially and on resize
+        window.addEventListener('resize', drawLines);
+        setTimeout(drawLines, 100); // Small delay to ensure render
+
+        // Logger
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: "numeric", minute: "numeric", second: "numeric" });
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Delay helper
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        // Reset state
+        function resetSimulation() {
+            document.querySelectorAll('.aws-node').forEach(el => {
+                el.classList.remove('node-active', 'active-api', 'active-lambda', 'active-rds', 'active-s3', 'active-sns');
+                el.parentElement.parentElement.classList.remove('status-granted', 'status-denied');
+            });
+            document.querySelectorAll('.line-animated').forEach(el => {
+                el.classList.remove('path-active', 'path-success', 'path-error');
+            });
+            lambdaStatus.style.opacity = '0';
+            lambdaStatus.className = 'absolute -top-3 -right-3 w-6 h-6 rounded-full flex items-center justify-center opacity-0 transition-opacity';
+            sysStatus.textContent = 'Awaiting input...';
+            sysStatus.className = 'text-slate-200 font-semibold';
+            
+            btnValid.disabled = false;
+            btnInvalid.disabled = false;
+        }
+
+        // Main Simulation Logic
+        async function runSimulation(isValid) {
+            btnValid.disabled = true;
+            btnInvalid.disabled = true;
+            resetSimulation();
+
+            const studentId = isValid ? 'STU-12345' : 'STU-99999';
+            const rootContainer = document.getElementById('diagram-container');
+            
+            log(`==== NEW SCAN INITIATED ====`, 'info');
+            
+            // Step 1: Turnstile
+            sysStatus.textContent = 'Card Scanned...';
+            nodes.turnstile.classList.add('node-active');
+            log(`Physical Turnstile: Card scanned (ID: ${studentId})`, 'info');
+            await sleep(600);
+
+            // Step 2: Path Turnstile -> API GW
+            paths['path-t-a'].classList.add('path-active');
+            await sleep(400);
+
+            // Step 3: API Gateway
+            sysStatus.textContent = 'Routing via API Gateway...';
+            nodes.apigw.classList.add('node-active', 'active-api');
+            log(`API Gateway: Received POST request, routing to Lambda.`, 'info');
+            await sleep(800);
+
+            // Step 4: Path API -> Lambda
+            paths['path-a-l'].classList.add('path-active');
+            await sleep(400);
+
+            // Step 5: Lambda Wake up
+            sysStatus.textContent = 'Lambda computing logic...';
+            nodes.lambda.classList.add('node-active', 'active-lambda');
+            log(`AWS Lambda: Container invoked (Cold Start: 0ms). Executing validation...`, 'warn');
+            await sleep(800);
+
+            // Step 6: Query RDS
+            paths['path-l-r'].classList.add('path-active');
+            nodes.rds.classList.add('node-active', 'active-rds');
+            log(`Amazon RDS: Querying database for Student ID: ${studentId}...`, 'info');
+            await sleep(1000);
+
+            if (isValid) {
+                // Success Scenario
+                log(`Amazon RDS: Validation SUCCESS. Limits OK.`, 'success');
+                rootContainer.classList.add('status-granted');
+                
+                lambdaStatus.style.opacity = '1';
+                lambdaStatus.classList.add('bg-green-500', 'border-green-600');
+                lambdaStatus.innerHTML = '<i class="fa-solid fa-check text-[10px] text-white"></i>';
+
+                paths['path-l-r'].classList.replace('path-active', 'path-success');
+                paths['path-a-l'].classList.add('path-success');
+                paths['path-t-a'].classList.add('path-success');
+
+                sysStatus.textContent = 'ACCESS GRANTED';
+                sysStatus.className = 'text-green-400 font-bold text-lg';
+                log(`AWS Lambda: Returning 200 OK. Turnstile Unlocked.`, 'success');
+
+                await sleep(600);
+                // Save to S3
+                paths['path-l-s'].classList.add('path-active', 'path-success');
+                nodes.s3.classList.add('node-active', 'active-s3');
+                log(`Amazon S3: Audit log securely saved (Status: GRANTED).`, 'info');
+
+            } else {
+                // Failure Scenario
+                log(`Amazon RDS: Validation FAILED. Event Limit Exceeded!`, 'error');
+                rootContainer.classList.add('status-denied');
+                
+                lambdaStatus.style.opacity = '1';
+                lambdaStatus.classList.add('bg-red-500', 'border-red-600');
+                lambdaStatus.innerHTML = '<i class="fa-solid fa-xmark text-[10px] text-white"></i>';
+
+                paths['path-l-r'].classList.replace('path-active', 'path-error');
+                paths['path-a-l'].classList.add('path-error');
+                paths['path-t-a'].classList.add('path-error');
+
+                sysStatus.textContent = 'ACCESS DENIED';
+                sysStatus.className = 'text-red-400 font-bold text-lg';
+                log(`AWS Lambda: Returning 403 Forbidden. Turnstile Locked.`, 'error');
+
+                await sleep(600);
+                // Alert SNS & Log S3
+                paths['path-l-n'].classList.add('path-active', 'path-error');
+                nodes.sns.classList.add('node-active', 'active-sns');
+                log(`Amazon SNS: ALERT Triggered! Notifying Admin via Email/SMS.`, 'error');
+                
+                paths['path-l-s'].classList.add('path-active', 'path-error');
+                nodes.s3.classList.add('node-active', 'active-s3');
+                log(`Amazon S3: Audit log securely saved (Status: DENIED).`, 'info');
+            }
+
+            log(`==== PROCESS COMPLETED ====`, 'info');
+            btnValid.disabled = false;
+            btnInvalid.disabled = false;
+        }
+
+        // Event Listeners
+        btnValid.addEventListener('click', () => runSimulation(true));
+        btnInvalid.addEventListener('click', () => runSimulation(false));
+        btnReset.addEventListener('click', () => {
+            resetSimulation();
+            log('Dashboard reset by user.', 'warn');
+        });
+
+    </script>
+</body>
+</html>
